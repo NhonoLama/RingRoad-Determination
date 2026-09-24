@@ -26,14 +26,8 @@ app.use(express.json());
 
 app.use((req, res, next) => {
   res.setHeader("Access-Control-Allow-Origin", "*");
-  res.setHeader(
-    "Access-Control-Allow-Methods",
-    "GET, POST, OPTIONS"
-  );
-  res.setHeader(
-    "Access-Control-Allow-Headers",
-    "Content-Type"
-  );
+  res.setHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
+  res.setHeader("Access-Control-Allow-Headers", "Content-Type");
 
   if (req.method === "OPTIONS") {
     return res.sendStatus(204);
@@ -49,9 +43,7 @@ app.use((req, res, next) => {
 */
 
 if (!process.env.LOCATIONIQ_API_KEY) {
-  console.error(
-    "ERROR: LOCATIONIQ_API_KEY missing from .env"
-  );
+  console.error("ERROR: LOCATIONIQ_API_KEY missing from .env");
 
   process.exit(1);
 }
@@ -69,8 +61,8 @@ if (!process.env.LOCATIONIQ_API_KEY) {
 const ringRoadPolygon = JSON.parse(
   fs.readFileSync(
     "/var/www/rainbowbakes.shop/ringroad-polygon.geojson",
-    "utf8"
-  )
+    "utf8",
+  ),
 );
 
 console.log("Kathmandu Ring Road polygon loaded.");
@@ -96,7 +88,7 @@ const OUTSIDE_DELIVERY_PRICE = 200;
 app.get("/", (req, res) => {
   res.json({
     status: "ok",
-    service: "Raindow Peaks Delivery API"
+    service: "Raindow Peaks Delivery API",
   });
 });
 
@@ -123,10 +115,7 @@ app.get("/location/autocomplete", async (req, res) => {
   try {
     const query = String(req.query.q || "").trim();
 
-    console.log(
-      "Autocomplete search:",
-      query
-    );
+    console.log("Autocomplete search:", query);
 
     /*
      * Don't waste LocationIQ requests for very short input.
@@ -135,78 +124,46 @@ app.get("/location/autocomplete", async (req, res) => {
       return res.json([]);
     }
 
-    const url = new URL(
-      "https://api.locationiq.com/v1/autocomplete"
-    );
+    const url = new URL("https://api.locationiq.com/v1/autocomplete");
 
-    url.searchParams.set(
-      "key",
-      process.env.LOCATIONIQ_API_KEY
-    );
+    url.searchParams.set("key", process.env.LOCATIONIQ_API_KEY);
 
-    url.searchParams.set(
-      "q",
-      query
-    );
+    url.searchParams.set("q", query);
 
     /*
      * Nepal only.
      */
-    url.searchParams.set(
-      "countrycodes",
-      "np"
-    );
+    url.searchParams.set("countrycodes", "np");
 
     /*
      * Bias search around Kathmandu Valley.
      *
      * west,south,east,north
      */
-    url.searchParams.set(
-      "viewbox",
-      "85.20,27.58,85.55,27.85"
-    );
+    url.searchParams.set("viewbox", "85.20,27.58,85.55,27.85");
 
     /*
      * 0 = Kathmandu is preferred,
      * but valid Nepal results outside the box are still possible.
      */
-    url.searchParams.set(
-      "bounded",
-      "1"
-    );
-    
+    url.searchParams.set("bounded", "1");
+
     url.searchParams.set("accept-language", "en");
 
-    url.searchParams.set(
-      "limit",
-      "5"
-    );
+    url.searchParams.set("limit", "5");
 
-    url.searchParams.set(
-      "normalizecity",
-      "1"
-    );
+    url.searchParams.set("normalizecity", "1");
 
-    url.searchParams.set(
-      "dedupe",
-      "1"
-    );
+    url.searchParams.set("dedupe", "1");
 
     const response = await fetch(url);
 
     if (!response.ok) {
       const text = await response.text();
 
-      console.error(
-        "LocationIQ autocomplete error:",
-        response.status,
-        text
-      );
+      console.error("LocationIQ autocomplete error:", response.status, text);
 
-      throw new Error(
-        `LocationIQ autocomplete HTTP ${response.status}`
-      );
+      throw new Error(`LocationIQ autocomplete HTTP ${response.status}`);
     }
 
     const results = await response.json();
@@ -223,30 +180,22 @@ app.get("/location/autocomplete", async (req, res) => {
     const suggestions = results.map((item) => ({
       placeId: item.place_id || null,
 
-      displayName:
-        item.display_name || "",
+      displayName: item.display_name || "",
 
-      latitude:
-        Number(item.lat),
+      latitude: Number(item.lat),
 
-      longitude:
-        Number(item.lon),
+      longitude: Number(item.lon),
 
-      type:
-        item.type || null,
+      type: item.type || null,
 
       address: {
-        name:
-          item.address?.name || "",
+        name: item.address?.name || "",
 
-        road:
-          item.address?.road || "",
+        road: item.address?.road || "",
 
-        neighbourhood:
-          item.address?.neighbourhood || "",
+        neighbourhood: item.address?.neighbourhood || "",
 
-        suburb:
-          item.address?.suburb || "",
+        suburb: item.address?.suburb || "",
 
         city:
           item.address?.city ||
@@ -254,29 +203,20 @@ app.get("/location/autocomplete", async (req, res) => {
           item.address?.municipality ||
           "Kathmandu",
 
-        postcode:
-          item.address?.postcode || "",
+        postcode: item.address?.postcode || "",
 
-        countryCode:
-          item.address?.country_code || "np"
-      }
+        countryCode: item.address?.country_code || "np",
+      },
     }));
 
-    console.log(
-      "Autocomplete suggestions:",
-      suggestions.length
-    );
+    console.log("Autocomplete suggestions:", suggestions.length);
 
     return res.json(suggestions);
-
   } catch (error) {
-    console.error(
-      "Autocomplete error:",
-      error.message
-    );
+    console.error("Autocomplete error:", error.message);
 
     return res.status(500).json({
-      error: "Unable to search locations"
+      error: "Unable to search locations",
     });
   }
 });
@@ -289,24 +229,15 @@ app.get("/location/autocomplete", async (req, res) => {
 
 app.post("/ghl/shipping-rates", async (req, res) => {
   try {
-    console.log(
-      "\n===== GHL SHIPPING REQUEST ====="
-    );
+    console.log("\n===== GHL SHIPPING REQUEST =====");
 
-    console.log(
-      JSON.stringify(req.body, null, 2)
-    );
+    console.log(JSON.stringify(req.body, null, 2));
 
-    const rate =
-      req.body?.rate;
+    const rate = req.body?.rate;
 
-    const destination =
-      rate?.destination;
+    const destination = rate?.destination;
 
-    const items =
-      Array.isArray(rate?.items)
-        ? rate.items
-        : [];
+    const items = Array.isArray(rate?.items) ? rate.items : [];
 
     /*
     |--------------------------------------------------------------------------
@@ -314,15 +245,11 @@ app.post("/ghl/shipping-rates", async (req, res) => {
     |--------------------------------------------------------------------------
     */
 
-    if (
-      !destination?.address1  
-    ) {
-      console.log(
-        "Destination incomplete — returning no rate"
-      );
+    if (!destination?.address1) {
+      console.log("Destination incomplete — returning no rate");
 
       return res.json({
-        rates: []
+        rates: [],
       });
     }
 
@@ -332,20 +259,13 @@ app.post("/ghl/shipping-rates", async (req, res) => {
     |--------------------------------------------------------------------------
     */
 
-    const subtotal = items.reduce(
-      (sum, item) => {
-        const totalPrice =
-          Number(item.totalPrice || 0);
+    const subtotal = items.reduce((sum, item) => {
+      const totalPrice = Number(item.totalPrice || 0);
 
-        return sum + totalPrice;
-      },
-      0
-    );
+      return sum + totalPrice;
+    }, 0);
 
-    console.log(
-      "Cart subtotal:",
-      `NPR ${subtotal}`
-    );
+    console.log("Cart subtotal:", `NPR ${subtotal}`);
 
     /*
     |--------------------------------------------------------------------------
@@ -353,20 +273,9 @@ app.post("/ghl/shipping-rates", async (req, res) => {
     |--------------------------------------------------------------------------
     */
 
-    const address = [
-      destination.address1,
-      destination.city,
-      destination.state,
-      destination.zip,
-      destination.country
-    ]
-      .filter(Boolean)
-      .join(", ");
+    const address = String(destination.address1 || "").trim();
 
-    console.log(
-      "Address to geocode:",
-      address
-    );
+    console.log("Address to geocode:", address);
 
     /*
     |--------------------------------------------------------------------------
@@ -384,102 +293,57 @@ app.post("/ghl/shipping-rates", async (req, res) => {
     |--------------------------------------------------------------------------
     */
 
-    const geocodeUrl = new URL(
-      "https://us1.locationiq.com/v1/search"
-    );
+    const geocodeUrl = new URL("https://us1.locationiq.com/v1/search");
 
-    geocodeUrl.searchParams.set(
-      "key",
-      process.env.LOCATIONIQ_API_KEY
-    );
+    geocodeUrl.searchParams.set("key", process.env.LOCATIONIQ_API_KEY);
 
-    geocodeUrl.searchParams.set(
-      "q",
-      address
-    );
+    geocodeUrl.searchParams.set("q", address);
 
-    geocodeUrl.searchParams.set(
-      "format",
-      "json"
-    );
+    geocodeUrl.searchParams.set("format", "json");
 
-    geocodeUrl.searchParams.set(
-      "countrycodes",
-      "np"
-    );
+    geocodeUrl.searchParams.set("countrycodes", "np");
 
-    geocodeUrl.searchParams.set(
-      "limit",
-      "1"
-    );
+    geocodeUrl.searchParams.set("limit", "1");
 
-    const geocodeResponse =
-      await fetch(geocodeUrl);
+    const geocodeResponse = await fetch(geocodeUrl);
 
     if (!geocodeResponse.ok) {
-      const text =
-        await geocodeResponse.text();
+      const text = await geocodeResponse.text();
 
       console.error(
         "LocationIQ geocoding error:",
         geocodeResponse.status,
-        text
+        text,
       );
 
-      throw new Error(
-        `LocationIQ geocoding HTTP ${geocodeResponse.status}`
-      );
+      throw new Error(`LocationIQ geocoding HTTP ${geocodeResponse.status}`);
     }
 
-    const results =
-      await geocodeResponse.json();
+    const results = await geocodeResponse.json();
 
-    if (
-      !Array.isArray(results) ||
-      results.length === 0
-    ) {
-      console.log(
-        "LocationIQ could not locate destination"
-      );
+    if (!Array.isArray(results) || results.length === 0) {
+      console.log("LocationIQ could not locate destination");
 
       return res.json({
-        rates: []
+        rates: [],
       });
     }
 
-    const latitude =
-      Number(results[0].lat);
+    const latitude = Number(results[0].lat);
 
-    const longitude =
-      Number(results[0].lon);
+    const longitude = Number(results[0].lon);
 
-    if (
-      !Number.isFinite(latitude) ||
-      !Number.isFinite(longitude)
-    ) {
-      throw new Error(
-        "Invalid coordinates returned by LocationIQ"
-      );
+    if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) {
+      throw new Error("Invalid coordinates returned by LocationIQ");
     }
 
-    console.log(
-      "Geocoded location:"
-    );
+    console.log("Geocoded location:");
 
-    console.log(
-      "Latitude:",
-      latitude
-    );
+    console.log("Latitude:", latitude);
 
-    console.log(
-      "Longitude:",
-      longitude
-    );
+    console.log("Longitude:", longitude);
 
-    console.log(
-      "Matched:",
-      results[0].display_name
-    );
+    console.log("Matched:", results[0].display_name);
 
     /*
     |--------------------------------------------------------------------------
@@ -498,11 +362,7 @@ app.post("/ghl/shipping-rates", async (req, res) => {
     |--------------------------------------------------------------------------
     */
 
-    const customerPoint =
-      turf.point([
-        longitude,
-        latitude
-      ]);
+    const customerPoint = turf.point([longitude, latitude]);
 
     /*
     |--------------------------------------------------------------------------
@@ -510,16 +370,12 @@ app.post("/ghl/shipping-rates", async (req, res) => {
     |--------------------------------------------------------------------------
     */
 
-    const insideRingRoad =
-      turf.booleanPointInPolygon(
-        customerPoint,
-        ringRoadPolygon
-      );
-
-    console.log(
-      "Inside Ring Road:",
-      insideRingRoad
+    const insideRingRoad = turf.booleanPointInPolygon(
+      customerPoint,
+      ringRoadPolygon,
     );
+
+    console.log("Inside Ring Road:", insideRingRoad);
 
     /*
     |--------------------------------------------------------------------------
@@ -531,7 +387,6 @@ app.post("/ghl/shipping-rates", async (req, res) => {
     let serviceName;
 
     if (insideRingRoad) {
-
       /*
        * INSIDE RING ROAD
        *
@@ -539,24 +394,16 @@ app.post("/ghl/shipping-rates", async (req, res) => {
        * <  1500 = Rs 100
        */
 
-      if (
-        subtotal >=
-        INSIDE_FREE_THRESHOLD
-      ) {
+      if (subtotal >= INSIDE_FREE_THRESHOLD) {
         deliveryPrice = 0;
 
-        serviceName =
-          "Inside Ring Road - Free Delivery";
+        serviceName = "Inside Ring Road - Free Delivery";
       } else {
-        deliveryPrice =
-          INSIDE_DELIVERY_PRICE;
+        deliveryPrice = INSIDE_DELIVERY_PRICE;
 
-        serviceName =
-          "Inside Ring Road Delivery";
+        serviceName = "Inside Ring Road Delivery";
       }
-
     } else {
-
       /*
        * OUTSIDE RING ROAD
        *
@@ -564,32 +411,20 @@ app.post("/ghl/shipping-rates", async (req, res) => {
        * <  3000 = Rs 200
        */
 
-      if (
-        subtotal >=
-        OUTSIDE_FREE_THRESHOLD
-      ) {
+      if (subtotal >= OUTSIDE_FREE_THRESHOLD) {
         deliveryPrice = 0;
 
-        serviceName =
-          "Outside Ring Road - Free Delivery";
+        serviceName = "Outside Ring Road - Free Delivery";
       } else {
-        deliveryPrice =
-          OUTSIDE_DELIVERY_PRICE;
+        deliveryPrice = OUTSIDE_DELIVERY_PRICE;
 
-        serviceName =
-          "Outside Ring Road Delivery";
+        serviceName = "Outside Ring Road Delivery";
       }
     }
 
-    console.log(
-      "Delivery price:",
-      `NPR ${deliveryPrice}`
-    );
+    console.log("Delivery price:", `NPR ${deliveryPrice}`);
 
-    console.log(
-      "Service:",
-      serviceName
-    );
+    console.log("Service:", serviceName);
 
     /*
     |--------------------------------------------------------------------------
@@ -602,26 +437,19 @@ app.post("/ghl/shipping-rates", async (req, res) => {
         {
           serviceName,
 
-          amount:
-            deliveryPrice,
+          amount: deliveryPrice,
 
-          currency:
-            rate?.currency || "NPR",
+          currency: rate?.currency || "NPR",
 
-          estimatedDays: 1
-        }
-      ]
+          estimatedDays: 1,
+        },
+      ],
     });
-
   } catch (error) {
-    console.error(
-      "Shipping calculation error:",
-      error.message
-    );
+    console.error("Shipping calculation error:", error.message);
 
     return res.status(500).json({
-      error:
-        "Unable to calculate delivery rate"
+      error: "Unable to calculate delivery rate",
     });
   }
 });
@@ -632,12 +460,6 @@ app.post("/ghl/shipping-rates", async (req, res) => {
 |--------------------------------------------------------------------------
 */
 
-app.listen(
-  PORT,
-  "0.0.0.0",
-  () => {
-    console.log(
-      `Raindow Delivery API running on port ${PORT}`
-    );
-  }
-);
+app.listen(PORT, "0.0.0.0", () => {
+  console.log(`Raindow Delivery API running on port ${PORT}`);
+});
