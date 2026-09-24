@@ -384,43 +384,32 @@ app.post("/ghl/shipping-rates", async (req, res) => {
     */
 
     let deliveryPrice;
-    let serviceName;
 
     if (insideRingRoad) {
-      /*
-       * INSIDE RING ROAD
-       *
-       * >= 1500 = FREE
-       * <  1500 = Rs 100
-       */
-
+      // Inside Ring Road
       if (subtotal >= INSIDE_FREE_THRESHOLD) {
         deliveryPrice = 0;
-
-        serviceName = "Inside Ring Road - Free Delivery";
       } else {
         deliveryPrice = INSIDE_DELIVERY_PRICE;
-
-        serviceName = "Inside Ring Road Delivery";
       }
     } else {
-      /*
-       * OUTSIDE RING ROAD
-       *
-       * >= 3000 = FREE
-       * <  3000 = Rs 200
-       */
-
+      // Outside Ring Road
       if (subtotal >= OUTSIDE_FREE_THRESHOLD) {
         deliveryPrice = 0;
-
-        serviceName = "Outside Ring Road - Free Delivery";
       } else {
         deliveryPrice = OUTSIDE_DELIVERY_PRICE;
-
-        serviceName = "Outside Ring Road Delivery";
       }
     }
+
+    /*
+     * IMPORTANT:
+     * Always return the SAME carrier service name that
+     * GHL sent in the request.
+     *
+     * This prevents GHL from treating the shipping rate
+     * as a different/expired service during payment.
+     */
+    const serviceName = rate?.carrierServices?.[0]?.name || "Delivery Fee";
 
     console.log("Delivery price:", `NPR ${deliveryPrice}`);
 
