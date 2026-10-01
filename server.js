@@ -81,6 +81,61 @@ const OUTSIDE_DELIVERY_PRICE = 200;
 
 /*
 |--------------------------------------------------------------------------
+| SELECTED LOCATION COORDINATE CACHE
+|--------------------------------------------------------------------------
+|
+| Stores the exact coordinates chosen from LocationIQ autocomplete.
+| Key = normalized GHL address
+|
+| Entries expire after 30 minutes.
+|
+*/
+
+const selectedLocationCache = new Map();
+
+const LOCATION_CACHE_TTL_MS = 30 * 60 * 1000;
+
+function normalizeAddress(value) {
+  return String(value || "")
+    .trim()
+    .replace(/\s+/g, " ")
+    .toLowerCase();
+}
+
+function saveSelectedLocation(address, latitude, longitude) {
+  const key = normalizeAddress(address);
+
+  if (!key) {
+    return;
+  }
+
+  selectedLocationCache.set(key, {
+    latitude,
+    longitude,
+    expiresAt: Date.now() + LOCATION_CACHE_TTL_MS,
+  });
+}
+
+function getSelectedLocation(address) {
+  const key = normalizeAddress(address);
+
+  const saved = selectedLocationCache.get(key);
+
+  if (!saved) {
+    return null;
+  }
+
+  if (Date.now() > saved.expiresAt) {
+    selectedLocationCache.delete(key);
+
+    return null;
+  }
+
+  return saved;
+}
+
+/*
+|--------------------------------------------------------------------------
 | HEALTH CHECK
 |--------------------------------------------------------------------------
 */
@@ -223,6 +278,52 @@ app.get("/location/autocomplete", async (req, res) => {
 
 /*
 |--------------------------------------------------------------------------
+| SAVE SELECTED LOCATION
+|--------------------------------------------------------------------------
+|
+| The checkout sends the exact autocomplete coordinates here
+| immediately after the customer selects a location.
+|
+*/
+
+app.post("/location/selected", (req, res) => {
+  try {
+    const address = String(req.body?.address || "").trim();
+
+    const latitude = Number(req.body?.latitude);
+
+    const longitude = Number(req.body?.longitude);
+
+    if (!address || !Number.isFinite(latitude) || !Number.isFinite(longitude)) {
+      return res.status(400).json({
+        error: "Invalid location data",
+      });
+    }
+
+    saveSelectedLocation(address, latitude, longitude);
+
+    console.log("Selected location saved:");
+
+    console.log("Address:", address);
+
+    console.log("Latitude:", latitude);
+
+    console.log("Longitude:", longitude);
+
+    return res.json({
+      success: true,
+    });
+  } catch (error) {
+    console.error("Selected location save error:", error.message);
+
+    return res.status(500).json({
+      error: "Unable to save location",
+    });
+  }
+});
+
+/*
+|--------------------------------------------------------------------------
 | GHL SHIPPING RATE CALLBACK
 |--------------------------------------------------------------------------
 */
@@ -275,75 +376,35 @@ app.post("/ghl/shipping-rates", async (req, res) => {
 
     const address = String(destination.address1 || "").trim();
 
-    console.log("Address to geocode:", address);
+    console.log("Destination address:", address);
 
     /*
-    |--------------------------------------------------------------------------
-    | FORWARD GEOCODING
-    |--------------------------------------------------------------------------
-    |
-    | Example:
-    |
-    | Putalisadak, Kathmandu
-    |
-    | becomes:
-    |
-    | lat: 27.704...
-    | lon: 85.322...
-    |--------------------------------------------------------------------------
-    */
+|--------------------------------------------------------------------------
+| GET EXACT AUTOCOMPLETE COORDINATES
+|--------------------------------------------------------------------------
+*/
 
-    const geocodeUrl = new URL("https://us1.locationiq.com/v1/search");
+    const savedLocation = getSelectedLocation(address);
 
-    geocodeUrl.searchParams.set("key", process.env.LOCATIONIQ_API_KEY);
+    if (!savedLocation) {
+      console.log("No saved coordinates for destination:");
 
-    geocodeUrl.searchParams.set("q", address);
-
-    geocodeUrl.searchParams.set("format", "json");
-
-    geocodeUrl.searchParams.set("countrycodes", "np");
-
-    geocodeUrl.searchParams.set("limit", "1");
-
-    const geocodeResponse = await fetch(geocodeUrl);
-
-    if (!geocodeResponse.ok) {
-      const text = await geocodeResponse.text();
-
-      console.error(
-        "LocationIQ geocoding error:",
-        geocodeResponse.status,
-        text,
-      );
-
-      throw new Error(`LocationIQ geocoding HTTP ${geocodeResponse.status}`);
-    }
-
-    const results = await geocodeResponse.json();
-
-    if (!Array.isArray(results) || results.length === 0) {
-      console.log("LocationIQ could not locate destination");
+      console.log(address);
 
       return res.json({
         rates: [],
       });
     }
 
-    const latitude = Number(results[0].lat);
+    const latitude = savedLocation.latitude;
 
-    const longitude = Number(results[0].lon);
+    const longitude = savedLocation.longitude;
 
-    if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) {
-      throw new Error("Invalid coordinates returned by LocationIQ");
-    }
-
-    console.log("Geocoded location:");
+    console.log("Coordinate source:", "autocomplete-selection");
 
     console.log("Latitude:", latitude);
 
     console.log("Longitude:", longitude);
-
-    console.log("Matched:", results[0].display_name);
 
     /*
     |--------------------------------------------------------------------------
