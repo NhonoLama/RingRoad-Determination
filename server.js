@@ -227,42 +227,62 @@ app.get("/location/autocomplete", async (req, res) => {
       return res.json([]);
     }
 
-    /*
-     * Only expose information our checkout needs.
-     *
-     * Do NOT expose our LocationIQ API key.
-     */
-    const suggestions = results.map((item) => ({
-      placeId: item.place_id || null,
+    const suggestions = results.map((item) => {
+      const city =
+        item.address?.city ||
+        item.address?.town ||
+        item.address?.municipality ||
+        "Kathmandu";
 
-      displayName: item.display_name || "",
+      /*
+       * Use LocationIQ postcode first.
+       * Only apply fallback when postcode is missing.
+       */
+      let postcode = item.address?.postcode || "";
 
-      latitude: Number(item.lat),
+      if (!postcode) {
+        const locationText = [city, item.display_name]
+          .filter(Boolean)
+          .join(" ")
+          .toLowerCase();
 
-      longitude: Number(item.lon),
+        if (locationText.includes("lalitpur")) {
+          postcode = "44700";
+        } else if (locationText.includes("bhaktapur")) {
+          postcode = "44800";
+        } else if (locationText.includes("kathmandu")) {
+          postcode = "44600";
+        }
+      }
 
-      type: item.type || null,
+      return {
+        placeId: item.place_id || null,
 
-      address: {
-        name: item.address?.name || "",
+        displayName: item.display_name || "",
 
-        road: item.address?.road || "",
+        latitude: Number(item.lat),
 
-        neighbourhood: item.address?.neighbourhood || "",
+        longitude: Number(item.lon),
 
-        suburb: item.address?.suburb || "",
+        type: item.type || null,
 
-        city:
-          item.address?.city ||
-          item.address?.town ||
-          item.address?.municipality ||
-          "Kathmandu",
+        address: {
+          name: item.address?.name || "",
 
-        postcode: item.address?.postcode || "",
+          road: item.address?.road || "",
 
-        countryCode: item.address?.country_code || "np",
-      },
-    }));
+          neighbourhood: item.address?.neighbourhood || "",
+
+          suburb: item.address?.suburb || "",
+
+          city: city,
+
+          postcode: postcode,
+
+          countryCode: item.address?.country_code || "np",
+        },
+      };
+    });
 
     console.log("Autocomplete suggestions:", suggestions.length);
 
@@ -301,14 +321,6 @@ app.post("/location/selected", (req, res) => {
     }
 
     saveSelectedLocation(address, latitude, longitude);
-
-    console.log("Selected location saved:");
-
-    console.log("Address:", address);
-
-    console.log("Latitude:", latitude);
-
-    console.log("Longitude:", longitude);
 
     return res.json({
       success: true,
@@ -471,10 +483,6 @@ app.post("/ghl/shipping-rates", async (req, res) => {
      * as a different/expired service during payment.
      */
     const serviceName = rate?.carrierServices?.[0]?.name || "Delivery Fee";
-
-    console.log("Delivery price:", `NPR ${deliveryPrice}`);
-
-    console.log("Service:", serviceName);
 
     /*
     |--------------------------------------------------------------------------
